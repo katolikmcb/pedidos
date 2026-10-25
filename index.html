@@ -3,8 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Formulário de recebimento de pedidos KATÓLIK — registro de pedidos com tamanhos, valores e envio via WhatsApp.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'self'">
 <title>KATÓLIK — Recebimento de Pedidos</title>
+<link rel="icon" href="icon-1024.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -104,16 +108,18 @@
   .field input[readonly]{background:#efe6dc;font-weight:600;}
 
   .checkbox-field{display:flex;align-items:flex-end;}
-  .checkbox-label{
-    display:flex !important;align-items:center;gap:8px;
-    font-size:13.5px !important;font-weight:500 !important;
-    text-transform:none !important;letter-spacing:0 !important;
-    color:var(--brown-dark) !important;cursor:pointer;
+  .field label.checkbox-label{
+    display:flex;align-items:center;gap:8px;
+    font-size:13.5px;font-weight:500;
+    text-transform:none;letter-spacing:0;
+    color:var(--brown-dark);cursor:pointer;
     padding:11px 0;
   }
-  .checkbox-label input[type="checkbox"]{
+  .field label.checkbox-label input[type="checkbox"]{
     width:18px;height:18px;accent-color:var(--brown);cursor:pointer;
   }
+
+  .field-limit{max-width:180px;}
 
   /* ---------- TAMANHOS: cartela estilo etiqueta de roupa ---------- */
   .tag-card{
@@ -153,7 +159,10 @@
     border-top:none;border-radius:0 0 6px 6px;
     padding:8px 0;font-family:'Space Mono',monospace;font-size:14px;
     background:var(--cream);
+    -moz-appearance:textfield;
   }
+  .size-box input::-webkit-outer-spin-button,
+  .size-box input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   .size-box input:focus{outline:none;border-color:var(--brown);background:var(--white);}
 
   .totals-bar{
@@ -163,10 +172,22 @@
   }
   .totals-bar b{font-size:16px;color:var(--black);}
 
+  /* ---------- VALORES / TROCO ---------- */
+  .troco-msg{
+    margin-top:14px;font-family:'Space Mono',monospace;
+    font-size:13px;color:var(--brown-dark);
+  }
+  .troco-msg:not(:empty){
+    background:var(--tan);border:1.5px dashed var(--gold);
+    border-radius:8px;padding:9px 14px;display:inline-block;
+    color:var(--brown-dark);font-weight:700;
+  }
+
   /* ---------- BOTÕES ---------- */
   .actions{
     display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;
   }
+  .actions-center{text-align:center;}
   button{
     font-family:'Bebas Neue',sans-serif;
     letter-spacing:1.5px;font-size:17px;
@@ -176,6 +197,7 @@
     transition:transform .1s, opacity .15s;
   }
   button:active{transform:scale(.97);}
+  button:disabled{opacity:.65;cursor:not-allowed;transform:none;}
   .btn-save{
     background:var(--brown-dark);color:var(--white);flex:1;justify-content:center;
     box-shadow:var(--shadow);
@@ -189,6 +211,15 @@
     background:transparent;color:var(--brown);
     text-decoration:underline;font-family:'Inter',sans-serif;
     font-size:13px;letter-spacing:0;padding:14px 8px;
+  }
+
+  button:focus-visible,
+  .field input:focus-visible,
+  .field select:focus-visible,
+  .size-box input:focus-visible,
+  .field label.checkbox-label input:focus-visible{
+    outline:2px solid var(--brown);
+    outline-offset:2px;
   }
 
   /* ---------- POPUP ---------- */
@@ -215,10 +246,21 @@
     font-size:12.5px;color:var(--danger);margin-top:8px;min-height:16px;
   }
 
+  .hidden{display:none;}
+
   @media (max-width:520px){
     .brand-logo{height:34px;}
     .actions{flex-direction:column;}
     .btn-clear{align-self:center;}
+  }
+
+  @media print{
+    body{background:#fff;padding:0;}
+    .actions, .actions-center, .status-msg, .pedido-chip, .troco-msg{display:none;}
+    .overlay{display:none !important;}
+    .card, .tag-card{box-shadow:none;border-color:#bbb;break-inside:avoid;}
+    .card{margin-bottom:14px;}
+    header.brand{margin-bottom:14px;}
   }
 </style>
 </head>
@@ -228,154 +270,250 @@
 
   <header class="brand">
     <div>
-      <img src="https://iili.io/CErVxLb.png" alt="Katólik" class="brand-logo">
+      <img src="logo-katolik.png" alt="Katólik" class="brand-logo">
       <div class="brand-sub">Recebimento de Pedidos</div>
     </div>
     <div class="pedido-chip">
-      <span class="dot"></span> Pedido nº <b id="pedidoNumero">—</b>
+      <span class="dot"></span> Pedido nº <b id="pedidoNumero">…</b>
     </div>
   </header>
 
-  <!-- DADOS DO PEDIDO -->
-  <section class="card">
-    <h2>Dados do Pedido</h2>
-    <div class="grid">
-      <div class="field">
-        <label>Data do Pedido</label>
-        <input type="date" id="dataPedido">
-      </div>
-      <div class="field">
-        <label>Cliente</label>
-        <input type="text" id="cliente" placeholder="Nome do cliente">
-      </div>
-      <div class="field">
-        <label>Contato (WhatsApp)</label>
-        <input type="text" id="contato" placeholder="(85) 9 9999-9999">
-      </div>
-      <div class="field">
-        <label>Produto</label>
-        <input type="text" id="produto" placeholder="Ex: Camisa Avé Maria">
-      </div>
-      <div class="field checkbox-field">
-        <label class="checkbox-label">
-          <input type="checkbox" id="semTamanho">
-          Produto sem tamanho (ex: terço, medalha)
-        </label>
-      </div>
-      <div class="field">
-        <label>Tecido</label>
-        <select id="tecido">
-          <option value="">Não se aplica / Selecionar...</option>
-          <option value="Dry Fit">Dry Fit</option>
-          <option value="Algodão">Algodão</option>
-          <option value="Poliéster">Poliéster</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Estampa</label>
-        <select id="estampa">
-          <option value="">Não se aplica / Selecione...</option>
-          <option value="DTF">DTF</option>
-          <option value="Sublimação">Sublimação</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Forma de Pagamento</label>
-        <select id="formaPg1">
-          <option value="">Selecione...</option>
-          <option value="Pix">Pix</option>
-          <option value="Dinheiro">Dinheiro</option>
-          <option value="Cartão de Crédito">Cartão de Crédito</option>
-          <option value="Cartão de Débito">Cartão de Débito</option>
-          <option value="Transferência">Transferência</option>
-        </select>
-      </div>
-    </div>
-  </section>
+  <form id="formPedido" novalidate>
 
-  <!-- QUADRO DE TAMANHOS -->
-  <section class="card">
-    <h2>Quadro de Tamanhos</h2>
+    <!-- DADOS DO PEDIDO -->
+    <section class="card">
+      <h2>Dados do Pedido</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="dataPedido">Data do Pedido</label>
+          <input type="date" id="dataPedido">
+        </div>
+        <div class="field">
+          <label for="cliente">Cliente</label>
+          <input type="text" id="cliente" placeholder="Nome do cliente" maxlength="150" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="contato">Contato (WhatsApp)</label>
+          <input type="text" id="contato" placeholder="(85) 9 9999-9999" maxlength="20" autocomplete="tel" inputmode="tel">
+        </div>
+        <div class="field">
+          <label for="produto">Produto</label>
+          <input type="text" id="produto" placeholder="Ex: Camisa Avé Maria" maxlength="150">
+        </div>
+        <div class="field checkbox-field">
+          <label class="checkbox-label" for="semTamanho">
+            <input type="checkbox" id="semTamanho">
+            Produto sem tamanho (ex: terço, medalha)
+          </label>
+        </div>
+        <div class="field">
+          <label for="tecido">Tecido</label>
+          <select id="tecido">
+            <option value="">Não se aplica / Selecionar...</option>
+            <option value="Dry Fit">Dry Fit</option>
+            <option value="Algodão">Algodão</option>
+            <option value="Poliéster">Poliéster</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="estampa">Estampa</label>
+          <select id="estampa">
+            <option value="">Não se aplica / Selecione...</option>
+            <option value="DTF">DTF</option>
+            <option value="Sublimação">Sublimação</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="formaPg1">Forma de Pagamento</label>
+          <select id="formaPg1">
+            <option value="">Selecione...</option>
+            <option value="Pix">Pix</option>
+            <option value="Dinheiro">Dinheiro</option>
+            <option value="Cartão de Crédito">Cartão de Crédito</option>
+            <option value="Cartão de Débito">Cartão de Débito</option>
+            <option value="Transferência">Transferência</option>
+          </select>
+        </div>
+      </div>
+    </section>
 
-    <div class="tag-card" id="tamanhosBox">
+    <!-- QUADRO DE TAMANHOS -->
+    <section class="card">
+      <h2>Quadro de Tamanhos</h2>
 
-      <div class="size-group">
-        <div class="size-group-title">Básicas</div>
-        <div class="size-row" data-group="Básicas">
-          <!-- gerado via JS -->
+      <div class="tag-card" id="tamanhosBox">
+
+        <div class="size-group">
+          <div class="size-group-title">Básicas</div>
+          <div class="size-row" data-group="Básicas">
+            <!-- gerado via JS -->
+          </div>
+        </div>
+
+        <div class="size-group">
+          <div class="size-group-title">Baby Look</div>
+          <div class="size-row" data-group="Baby Look"></div>
+        </div>
+
+        <div class="size-group">
+          <div class="size-group-title">Infantil</div>
+          <div class="size-row" data-group="Infantil"></div>
+        </div>
+
+        <div class="totals-bar">
+          <div>Peças selecionadas: <b id="totalPecas">0</b></div>
         </div>
       </div>
 
-      <div class="size-group">
-        <div class="size-group-title">Baby Look</div>
-        <div class="size-row" data-group="Baby Look"></div>
+      <div class="tag-card hidden" id="qtdeSimplesBox">
+        <div class="field field-limit">
+          <label for="qtdeSimples">Quantidade</label>
+          <input type="number" id="qtdeSimples" min="1" value="1" inputmode="numeric">
+        </div>
       </div>
+    </section>
 
-      <div class="size-group">
-        <div class="size-group-title">Infantil</div>
-        <div class="size-row" data-group="Infantil"></div>
+    <!-- VALORES -->
+    <section class="card">
+      <h2>Valores</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="valor">Valor Total (R$)</label>
+          <input type="text" inputmode="decimal" id="valor" placeholder="0,00">
+        </div>
+        <div class="field">
+          <label for="recebido">Valor Recebido (R$)</label>
+          <input type="text" inputmode="decimal" id="recebido" placeholder="0,00">
+        </div>
+        <div class="field">
+          <label for="aReceber">À Receber (R$)</label>
+          <input type="text" id="aReceber" readonly value="0,00">
+        </div>
       </div>
+      <div class="troco-msg" id="trocoMsg" aria-live="polite"></div>
+    </section>
 
-      <div class="totals-bar">
-        <div>Peças selecionadas: <b id="totalPecas">0</b></div>
-      </div>
+    <div class="actions">
+      <button class="btn-save" id="btnSalvar" type="submit">💾 Salvar Pedido</button>
+      <button class="btn-wpp" id="btnWpp" type="button">✆ Enviar via WhatsApp</button>
     </div>
-
-    <div class="tag-card" id="qtdeSimplesBox" style="display:none;">
-      <div class="field" style="max-width:180px;">
-        <label>Quantidade</label>
-        <input type="number" id="qtdeSimples" min="1" value="1">
-      </div>
+    <div class="actions-center">
+      <button class="btn-clear" id="btnLimpar" type="button">Limpar formulário</button>
     </div>
-  </section>
+    <div class="status-msg" id="statusMsg" role="status" aria-live="polite"></div>
 
-  <!-- VALORES -->
-  <section class="card">
-    <h2>Valores</h2>
-    <div class="grid">
-      <div class="field">
-        <label>Valor Total (R$)</label>
-        <input type="text" inputmode="decimal" id="valor" placeholder="0,00">
-      </div>
-      <div class="field">
-        <label>Valor Recebido (R$)</label>
-        <input type="text" inputmode="decimal" id="recebido" placeholder="0,00">
-      </div>
-      <div class="field">
-        <label>À Receber (R$)</label>
-        <input type="text" id="aReceber" readonly value="0,00">
-      </div>
-    </div>
-  </section>
-
-  <div class="actions">
-    <button class="btn-save" id="btnSalvar" type="button">💾 Salvar Pedido</button>
-    <button class="btn-wpp" id="btnWpp" type="button">✆ Enviar via WhatsApp</button>
-  </div>
-  <div style="text-align:center;">
-    <button class="btn-clear" id="btnLimpar" type="button">Limpar formulário</button>
-  </div>
-  <div class="status-msg" id="statusMsg"></div>
+  </form>
 
 </div>
 
 <!-- POPUP DE SUCESSO -->
 <div class="overlay" id="overlay">
-  <div class="popup">
-    <div class="check">✓</div>
-    <h3>Pedido salvo!</h3>
+  <div class="popup" role="dialog" aria-modal="true" aria-labelledby="popupTitulo" aria-describedby="popupTexto">
+    <div class="check" aria-hidden="true">✓</div>
+    <h3 id="popupTitulo">Pedido salvo!</h3>
     <p id="popupTexto">O pedido foi registrado na planilha com sucesso.</p>
     <button id="popupFechar" type="button">Continuar</button>
   </div>
 </div>
 
 <script>
+(function(){
+"use strict";
+
 /* =======================================================
    CONFIGURAÇÃO — cole aqui a URL do seu Web App (Apps Script)
    ======================================================= */
 const CONFIG = {
-  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzGNGHJwXbVwvUrDPsYi0MeBZQzwdykTAOl7zU_sovnG4FJS_cxfsvnPIcyNiRzO9oboA/exec"
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyvXp9ZfcZRodaXLhm8FJk3rFJ4ykRbJtnvMRitUg3d4GRgkYB6irvh2b2nmnT2nunSlA/exec",
+  TOKEN: "76b0ecb9de07419d8c3f30f947872e62", // deve ser idêntico ao TOKEN em "código gs.txt"
+  TIMEOUT_MS: 15000,
+  RASCUNHO_KEY: "katolik-rascunho-v1"
 };
+
+/* =======================================================
+   HELPERS E ELEMENTOS
+   ======================================================= */
+const $ = id => document.getElementById(id);
+
+const el = {
+  form: $("formPedido"),
+  pedidoNumero: $("pedidoNumero"),
+  statusMsg: $("statusMsg"),
+  dataPedido: $("dataPedido"),
+  cliente: $("cliente"),
+  contato: $("contato"),
+  produto: $("produto"),
+  tecido: $("tecido"),
+  estampa: $("estampa"),
+  formaPg1: $("formaPg1"),
+  valor: $("valor"),
+  recebido: $("recebido"),
+  aReceber: $("aReceber"),
+  trocoMsg: $("trocoMsg"),
+  totalPecas: $("totalPecas"),
+  semTamanho: $("semTamanho"),
+  tamanhosBox: $("tamanhosBox"),
+  qtdeSimplesBox: $("qtdeSimplesBox"),
+  qtdeSimples: $("qtdeSimples"),
+  overlay: $("overlay"),
+  popupTexto: $("popupTexto"),
+  popupFechar: $("popupFechar"),
+  btnSalvar: $("btnSalvar"),
+  btnWpp: $("btnWpp"),
+  btnLimpar: $("btnLimpar")
+};
+
+let tamanhosResumo = "";
+let qtdeTotal = 0;
+let focoAnteriorPopup = null;
+let rascunhoTimer = null;
+
+function setStatus(msg){
+  el.statusMsg.textContent = msg || "";
+}
+
+/* =======================================================
+   FETCH COM TIMEOUT E JSON SEGURO
+   ======================================================= */
+async function fetchJson(url, options){
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=> ctrl.abort(), CONFIG.TIMEOUT_MS);
+  try{
+    const resp = await fetch(url, Object.assign({}, options, {
+      signal: ctrl.signal,
+      cache: "no-store"
+    }));
+    const ctype = (resp.headers.get("content-type") || "").toLowerCase();
+    if(!resp.ok || ctype.indexOf("json") === -1){
+      throw new Error("resposta inesperada do servidor (HTTP " + resp.status + ")");
+    }
+    return await resp.json();
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+function textoErro(err){
+  if(err && err.name === "AbortError") return "o servidor demorou mais de 15s para responder";
+  return (err && err.message) ? err.message : "erro desconhecido";
+}
+
+/* =======================================================
+   DATA SEM ERRO DE FUSO (evita marcar o dia seguinte à noite)
+   ======================================================= */
+function hojeISO(){
+  const d = new Date();
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+// Converte "2026-07-13" (input type=date) em "13/07/2026"
+function formatarDataBR(dataISO){
+  if(!dataISO) return "";
+  const partes = dataISO.split("-");
+  if(partes.length !== 3) return "";
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
 
 /* =======================================================
    QUADRO DE TAMANHOS
@@ -386,57 +524,78 @@ const sizeGroups = [
   { name: "Infantil",  sizes: ["01","02","04","06","08","10","12"] }
 ];
 
+function buscarInputSize(grupo, tamanho){
+  return document.querySelector(`.size-box input[data-group="${grupo}"][data-size="${tamanho}"]`);
+}
+
 function buildSizeGrid(){
   sizeGroups.forEach(group=>{
     const row = document.querySelector(`.size-row[data-group="${group.name}"]`);
+    if(!row) return;
     group.sizes.forEach(size=>{
       const box = document.createElement("div");
       box.className = "size-box";
       box.innerHTML = `
         <div class="lbl">${size}</div>
-        <input type="number" min="0" value="0"
+        <input type="number" min="0" step="1" value="0"
+          aria-label="Quantidade — ${group.name} ${size}"
           data-group="${group.name}" data-size="${size}">
       `;
       row.appendChild(box);
     });
   });
-  document.querySelectorAll('.size-box input').forEach(inp=>{
-    inp.addEventListener('input', recalcSizes);
-    inp.addEventListener('focus', function(){
+
+  document.querySelectorAll(".size-box input").forEach(inp=>{
+    inp.addEventListener("input", recalcSizes);
+    inp.addEventListener("focus", function(){
       if(this.value === "0") this.value = "";
       this.select();
     });
-    inp.addEventListener('blur', function(){
-      if(this.value.trim() === ""){
-        this.value = "0";
-        recalcSizes();
-      }
+    inp.addEventListener("blur", function(){
+      const q = parseInt(this.value, 10);
+      this.value = (isNaN(q) || q < 0) ? "0" : String(q);
+      recalcSizes();
     });
   });
 }
 
-function recalcSizes(){
+// Coleta os tamanhos em estrutura única (fonte única de verdade)
+function coletarTamanhos(){
+  const grupos = [];
   let total = 0;
-  const partesResumo = [];
-
   sizeGroups.forEach(group=>{
     const itens = [];
     group.sizes.forEach(size=>{
-      const inp = document.querySelector(`.size-box input[data-group="${group.name}"][data-size="${size}"]`);
-      const qtd = parseInt(inp.value || "0", 10);
+      const inp = buscarInputSize(group.name, size);
+      if(!inp) return;
+      const qtd = Math.max(0, parseInt(inp.value || "0", 10) || 0);
       if(qtd > 0){
-        itens.push(`${size} x${qtd}`);
+        itens.push({ size: size, qtd: qtd });
         total += qtd;
       }
     });
-    if(itens.length){
-      partesResumo.push(`${group.name}: ${itens.join(", ")}`);
-    }
+    if(itens.length) grupos.push({ name: group.name, itens: itens });
   });
+  return { grupos: grupos, total: total };
+}
 
-  document.getElementById('totalPecas').textContent = total;
-  window._tamanhosResumo = partesResumo.join(" | ");
-  window._qtdeTotal = total;
+function formatoResumo(grupos){
+  return grupos
+    .map(g => `${g.name}: ${g.itens.map(i => `${i.size} x${i.qtd}`).join(", ")}`)
+    .join(" | ");
+}
+
+function formatoMultilinha(grupos){
+  return grupos
+    .map(g => `* ${g.name}: ${g.itens.map(i => `${i.size} x${i.qtd}`).join(", ")}`)
+    .join("\n");
+}
+
+function recalcSizes(){
+  const dados = coletarTamanhos();
+  qtdeTotal = dados.total;
+  tamanhosResumo = formatoResumo(dados.grupos);
+  el.totalPecas.textContent = dados.total;
 }
 
 /* =======================================================
@@ -465,179 +624,312 @@ function aplicarMascaraMoeda(input){
 }
 
 function recalcValores(){
-  const valor = moedaParaNumero(document.getElementById('valor').value);
-  const recebido = moedaParaNumero(document.getElementById('recebido').value);
+  const valor = moedaParaNumero(el.valor.value);
+  const recebido = moedaParaNumero(el.recebido.value);
   const aReceber = Math.max(valor - recebido, 0);
-  document.getElementById('aReceber').value = numeroParaMoeda(aReceber);
+  el.aReceber.value = numeroParaMoeda(aReceber);
+
+  if(valor > 0 && recebido > valor){
+    el.trocoMsg.textContent = `Troco a devolver: R$ ${numeroParaMoeda(recebido - valor)}`;
+  }else{
+    el.trocoMsg.textContent = "";
+  }
 }
 
 ['valor','recebido'].forEach(id=>{
-  const el = document.getElementById(id);
-  el.addEventListener('input', ()=>{
-    aplicarMascaraMoeda(el);
+  const campo = el[id];
+  campo.addEventListener('input', ()=>{
+    aplicarMascaraMoeda(campo);
     recalcValores();
+    agendarRascunho();
   });
-  el.addEventListener('focus', ()=> el.select());
+  campo.addEventListener('focus', ()=> campo.select());
 });
 
 /* =======================================================
    NÚMERO DO PEDIDO (sequencial, vindo do Apps Script)
    ======================================================= */
 async function carregarProximoPedido(){
+  el.pedidoNumero.textContent = "…";
   try{
-    const resp = await fetch(`${CONFIG.SCRIPT_URL}?action=nextPedido`);
-    const data = await resp.json();
-    document.getElementById('pedidoNumero').textContent = data.nextPedido;
-    window._pedidoAtual = data.nextPedido;
+    const data = await fetchJson(`${CONFIG.SCRIPT_URL}?action=nextPedido&token=${encodeURIComponent(CONFIG.TOKEN)}`);
+    if(data.nextPedido === undefined || data.nextPedido === null){
+      throw new Error("número de pedido não retornado");
+    }
+    el.pedidoNumero.textContent = data.nextPedido;
+    return true;
   }catch(err){
-    document.getElementById('pedidoNumero').textContent = "?";
+    el.pedidoNumero.textContent = "?";
     setStatus("Não foi possível consultar o próximo número de pedido. Verifique a URL do Apps Script.");
+    return false;
   }
-}
-
-// Converte "2026-07-13" (input type=date) em "13/07/2026"
-function formatarDataBR(dataISO){
-  if(!dataISO) return "";
-  const [ano, mes, dia] = dataISO.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
-
-function setStatus(msg){
-  document.getElementById('statusMsg').textContent = msg || "";
 }
 
 /* =======================================================
    PRODUTO SEM TAMANHO (ex: terço, medalha)
    ======================================================= */
-const chkSemTamanho = document.getElementById('semTamanho');
-const tamanhosBox = document.getElementById('tamanhosBox');
-const qtdeSimplesBox = document.getElementById('qtdeSimplesBox');
-const qtdeSimplesInput = document.getElementById('qtdeSimples');
-
-chkSemTamanho.addEventListener('change', ()=>{
-  if(chkSemTamanho.checked){
-    tamanhosBox.style.display = "none";
-    qtdeSimplesBox.style.display = "block";
-  }else{
-    tamanhosBox.style.display = "block";
-    qtdeSimplesBox.style.display = "none";
-  }
-});
+function alternarModoTamanho(){
+  const sem = el.semTamanho.checked;
+  el.tamanhosBox.classList.toggle("hidden", sem);
+  el.qtdeSimplesBox.classList.toggle("hidden", !sem);
+}
+el.semTamanho.addEventListener("change", alternarModoTamanho);
 
 // Retorna a quantidade total considerando o modo atual (com ou sem tamanho)
 function getQtdeAtual(){
-  if(chkSemTamanho.checked){
-    return parseInt(qtdeSimplesInput.value || "0", 10) || 0;
+  if(el.semTamanho.checked){
+    return parseInt(el.qtdeSimples.value || "0", 10) || 0;
   }
-  return window._qtdeTotal || 0;
+  return qtdeTotal;
 }
 
-// Retorna o resumo de tamanhos (vazio quando o produto não usa tamanho)
+// Retorna a resumo de tamanhos (vazio quando o produto não usa tamanho)
 function getTamanhosResumoAtual(){
-  return chkSemTamanho.checked ? "" : (window._tamanhosResumo || "");
+  return el.semTamanho.checked ? "" : tamanhosResumo;
 }
+
+/* =======================================================
+   RASCUNHO LOCAL (localStorage) — evita perder dados
+   ======================================================= */
+function dadosDoRascunho(){
+  const tamanhos = {};
+  document.querySelectorAll(".size-box input").forEach(inp=>{
+    const q = Math.max(0, parseInt(inp.value || "0", 10) || 0);
+    if(q > 0) tamanhos[inp.dataset.group + "|" + inp.dataset.size] = q;
+  });
+  return {
+    dataPedido: el.dataPedido.value,
+    cliente: el.cliente.value,
+    contato: el.contato.value,
+    produto: el.produto.value,
+    semTamanho: el.semTamanho.checked,
+    tecido: el.tecido.value,
+    estampa: el.estampa.value,
+    formaPg1: el.formaPg1.value,
+    valor: el.valor.value,
+    recebido: el.recebido.value,
+    qtdeSimples: el.qtdeSimples.value,
+    tamanhos: tamanhos
+  };
+}
+
+function salvarRascunho(){
+  try{
+    localStorage.setItem(CONFIG.RASCUNHO_KEY, JSON.stringify(dadosDoRascunho()));
+  }catch(err){ /* armazenamento indisponível */ }
+}
+
+function agendarRascunho(){
+  clearTimeout(rascunhoTimer);
+  rascunhoTimer = setTimeout(salvarRascunho, 400);
+}
+
+function limparRascunho(){
+  clearTimeout(rascunhoTimer);
+  try{
+    localStorage.removeItem(CONFIG.RASCUNHO_KEY);
+  }catch(err){ /* armazenamento indisponível */ }
+}
+
+function restaurarRascunho(){
+  try{
+    const bruto = localStorage.getItem(CONFIG.RASCUNHO_KEY);
+    if(!bruto) return false;
+    const d = JSON.parse(bruto);
+    if(!d || typeof d !== "object") return false;
+
+    if(typeof d.dataPedido === "string" && d.dataPedido) el.dataPedido.value = d.dataPedido;
+    el.cliente.value = typeof d.cliente === "string" ? d.cliente : "";
+    el.contato.value = typeof d.contato === "string" ? d.contato : "";
+    el.produto.value = typeof d.produto === "string" ? d.produto : "";
+    el.tecido.value = typeof d.tecido === "string" ? d.tecido : "";
+    el.estampa.value = typeof d.estampa === "string" ? d.estampa : "";
+    el.formaPg1.value = typeof d.formaPg1 === "string" ? d.formaPg1 : "";
+    el.valor.value = typeof d.valor === "string" ? d.valor : "";
+    el.recebido.value = typeof d.recebido === "string" ? d.recebido : "";
+    el.qtdeSimples.value = d.qtdeSimples || "1";
+    el.semTamanho.checked = !!d.semTamanho;
+
+    if(d.tamanhos && typeof d.tamanhos === "object"){
+      Object.keys(d.tamanhos).forEach(chave=>{
+        const partes = chave.split("|");
+        const inp = buscarInputSize(partes[0], partes[1]);
+        const q = Math.max(0, parseInt(d.tamanhos[chave], 10) || 0);
+        if(inp && q > 0) inp.value = String(q);
+      });
+    }
+
+    alternarModoTamanho();
+    return true;
+  }catch(err){
+    return false;
+  }
+}
+
+el.form.addEventListener("input", agendarRascunho);
+el.form.addEventListener("change", agendarRascunho);
+
+/* =======================================================
+   POPUP DE SUCESSO (dialog acessível)
+   ======================================================= */
+function abrirPopup(){
+  focoAnteriorPopup = document.activeElement;
+  el.overlay.classList.add("show");
+  el.popupFechar.focus();
+}
+
+function fecharPopup(){
+  el.overlay.classList.remove("show");
+  if(focoAnteriorPopup && document.contains(focoAnteriorPopup)){
+    focoAnteriorPopup.focus();
+  }
+  focoAnteriorPopup = null;
+}
+
+el.popupFechar.addEventListener("click", fecharPopup);
+el.overlay.addEventListener("click", ev=>{
+  if(ev.target === el.overlay) fecharPopup();
+});
+document.addEventListener("keydown", ev=>{
+  if(!el.overlay.classList.contains("show")) return;
+  if(ev.key === "Escape"){
+    ev.preventDefault();
+    fecharPopup();
+  }else if(ev.key === "Tab"){
+    // mantém o foco preso dentro do popup (botão único)
+    ev.preventDefault();
+    el.popupFechar.focus();
+  }
+});
 
 /* =======================================================
    SALVAR PEDIDO
    ======================================================= */
-document.getElementById('btnSalvar').addEventListener('click', async ()=>{
+el.form.addEventListener("submit", async (ev)=>{
+  ev.preventDefault();
   setStatus("");
-  const cliente = document.getElementById('cliente').value.trim();
-  const produto = document.getElementById('produto').value.trim();
+
+  const cliente = el.cliente.value.trim();
+  const produto = el.produto.value.trim();
 
   if(!cliente || !produto){
     setStatus("Preencha ao menos Cliente e Produto antes de salvar.");
     return;
   }
 
+  const qtde = getQtdeAtual();
+  if(qtde <= 0){
+    setStatus(el.semTamanho.checked
+      ? "Informe a Quantidade do produto antes de salvar."
+      : "Informe a quantidade de peças no Quadro de Tamanhos antes de salvar.");
+    return;
+  }
+
+  const valor = moedaParaNumero(el.valor.value);
+  if(valor <= 0){
+    setStatus("Informe o Valor Total do pedido antes de salvar.");
+    return;
+  }
+
   const payload = {
-    dataPedido: formatarDataBR(document.getElementById('dataPedido').value),
+    token: CONFIG.TOKEN,
+    dataPedido: formatarDataBR(el.dataPedido.value),
     cliente: cliente,
-    contato: document.getElementById('contato').value.trim(),
+    contato: el.contato.value.trim(),
     produto: produto,
     tamanhos: getTamanhosResumoAtual(),
-    qtde: getQtdeAtual(),
-    valor: moedaParaNumero(document.getElementById('valor').value),
-    recebido: moedaParaNumero(document.getElementById('recebido').value),
-    tecido: document.getElementById('tecido').value,
-    estampa: document.getElementById('estampa').value,
-    formaPg1: document.getElementById('formaPg1').value
+    qtde: qtde,
+    valor: valor,
+    recebido: moedaParaNumero(el.recebido.value),
+    tecido: el.tecido.value,
+    estampa: el.estampa.value,
+    formaPg1: el.formaPg1.value
   };
 
-  const btn = document.getElementById('btnSalvar');
+  const btn = el.btnSalvar;
   btn.disabled = true;
   btn.textContent = "Salvando...";
 
   try{
-    const resp = await fetch(CONFIG.SCRIPT_URL, {
+    const data = await fetchJson(CONFIG.SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     });
-    const data = await resp.json();
 
     if(data.success){
-      document.getElementById('popupTexto').textContent =
+      if(data.pedido !== undefined && data.pedido !== null){
+        el.pedidoNumero.textContent = data.pedido;
+      }
+      el.popupTexto.textContent =
         `Pedido nº ${data.pedido} de ${cliente} foi registrado na planilha com sucesso.`;
-      document.getElementById('overlay').classList.add('show');
+      abrirPopup();
       limparFormulario();
       carregarProximoPedido();
     }else{
       setStatus("Erro ao salvar: " + (data.error || "tente novamente."));
     }
   }catch(err){
-    setStatus("Erro de conexão com o Apps Script. Confirme se a URL foi publicada corretamente.");
+    setStatus("Não foi possível confirmar o salvamento (" + textoErro(err) +
+      "). Confira a planilha antes de reenviar, para evitar pedidos duplicados.");
   }finally{
     btn.disabled = false;
-    btn.innerHTML = "💾 Salvar Pedido";
+    btn.textContent = "💾 Salvar Pedido";
   }
 });
-
-document.getElementById('popupFechar').addEventListener('click', ()=>{
-  document.getElementById('overlay').classList.remove('show');
-});
-
-/* =======================================================
-   Monta os tamanhos em linhas distintas (uso exclusivo da
-   mensagem do WhatsApp — a coluna "Tamanhos" da planilha
-   continua no formato resumido de sempre)
-   ======================================================= */
-function getTamanhosMultilinha(){
-  const linhas = [];
-  sizeGroups.forEach(group=>{
-    const itens = [];
-    group.sizes.forEach(size=>{
-      const inp = document.querySelector(`.size-box input[data-group="${group.name}"][data-size="${size}"]`);
-      const qtd = parseInt(inp.value || "0", 10);
-      if(qtd > 0) itens.push(`${size} x${qtd}`);
-    });
-    if(itens.length) linhas.push(`* ${group.name}: ${itens.join(", ")}`);
-  });
-  return linhas.join("\n");
-}
 
 /* =======================================================
    ENVIAR VIA WHATSAPP
    ======================================================= */
-document.getElementById('btnWpp').addEventListener('click', ()=>{
-  const cliente = document.getElementById('cliente').value.trim();
-  const contato = document.getElementById('contato').value.trim();
-  const produto = document.getElementById('produto').value.trim();
-  const tecido = document.getElementById('tecido').value;
-  const estampa = document.getElementById('estampa').value;
-  const pedido = document.getElementById('pedidoNumero').textContent;
-  const tamanhos = chkSemTamanho.checked ? "" : getTamanhosMultilinha();
-  const valor = document.getElementById('valor').value;
-  const recebido = document.getElementById('recebido').value;
-  const aReceber = document.getElementById('aReceber').value;
+// Normaliza para o formato internacional: 55 + DDD + número
+function normalizarNumeroWpp(contato){
+  let n = String(contato).replace(/\D/g, "");
+  if(n.length >= 12 && n.length <= 13 && n.startsWith("55")) return n;
+  if(n.length === 10 || n.length === 11) return "55" + n;
+  if(n.length === 12 || n.length === 13) return n;
+  return null;
+}
+
+el.btnWpp.addEventListener("click", async ()=>{
+  setStatus("");
+
+  const cliente = el.cliente.value.trim();
+  const produto = el.produto.value.trim();
+  const contato = el.contato.value.trim();
 
   if(!contato){
     setStatus("Informe o contato do cliente para enviar via WhatsApp.");
     return;
   }
 
-  let numero = contato.replace(/\D/g, "");
-  if(numero.length <= 11) numero = "55" + numero; // adiciona DDI Brasil se não informado
+  const numero = normalizarNumeroWpp(contato);
+  if(!numero){
+    setStatus("Número de WhatsApp inválido. Informe DDD + número (ex: 85 9 9999-9999).");
+    return;
+  }
+
+  if(!produto){
+    setStatus("Informe o produto antes de enviar a mensagem.");
+    return;
+  }
+
+  // Garante um número de pedido válido antes de montar a mensagem
+  let pedido = el.pedidoNumero.textContent.trim();
+  if(!/^\d+$/.test(pedido)){
+    await carregarProximoPedido();
+    pedido = el.pedidoNumero.textContent.trim();
+    if(!/^\d+$/.test(pedido)){
+      setStatus("Não foi possível obter o número do pedido. Verifique a conexão e tente novamente.");
+      return;
+    }
+  }
+
+  const tecido = el.tecido.value;
+  const estampa = el.estampa.value;
+  const tamanhos = el.semTamanho.checked ? "" : formatoMultilinha(coletarTamanhos().grupos);
+  const valor = el.valor.value;
+  const recebido = el.recebido.value;
+  const aReceber = el.aReceber.value;
 
   // Monta os detalhes do pedido, incluindo Tecido/Estampa/Tamanhos
   // somente quando fizerem sentido para o produto (ex: não aparecem
@@ -672,33 +964,38 @@ ${detalhes.join("\n")}
    LIMPAR FORMULÁRIO
    ======================================================= */
 function limparFormulario(){
-  document.getElementById('cliente').value = "";
-  document.getElementById('contato').value = "";
-  document.getElementById('produto').value = "";
-  document.getElementById('tecido').value = "";
-  document.getElementById('estampa').value = "";
-  document.getElementById('formaPg1').value = "";
-  document.getElementById('valor').value = "0,00";
-  document.getElementById('recebido').value = "0,00";
-  document.getElementById('aReceber').value = "0,00";
-  document.getElementById('dataPedido').valueAsDate = new Date();
-  document.querySelectorAll('.size-box input').forEach(inp=> inp.value = "0");
+  el.cliente.value = "";
+  el.contato.value = "";
+  el.produto.value = "";
+  el.tecido.value = "";
+  el.estampa.value = "";
+  el.formaPg1.value = "";
+  el.valor.value = "0,00";
+  el.recebido.value = "0,00";
+  el.aReceber.value = "0,00";
+  el.trocoMsg.textContent = "";
+  el.dataPedido.value = hojeISO();
+  document.querySelectorAll(".size-box input").forEach(inp=> inp.value = "0");
   recalcSizes();
-  chkSemTamanho.checked = false;
-  tamanhosBox.style.display = "block";
-  qtdeSimplesBox.style.display = "none";
-  qtdeSimplesInput.value = "1";
+  el.semTamanho.checked = false;
+  alternarModoTamanho();
+  el.qtdeSimples.value = "1";
   setStatus("");
+  limparRascunho();
 }
-document.getElementById('btnLimpar').addEventListener('click', limparFormulario);
+el.btnLimpar.addEventListener("click", limparFormulario);
 
 /* =======================================================
    INICIALIZAÇÃO
    ======================================================= */
 buildSizeGrid();
+const rascunhoRestaurado = restaurarRascunho();
+if(!rascunhoRestaurado) el.dataPedido.value = hojeISO();
 recalcSizes();
-document.getElementById('dataPedido').valueAsDate = new Date();
+recalcValores();
 carregarProximoPedido();
+
+})();
 </script>
 
 </body>
